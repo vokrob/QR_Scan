@@ -13,6 +13,9 @@ interface Dao {
 
     @Query("SELECT * FROM products")
     fun getAllProducts(): Flow<List<Product>>
+
+    @Query("SELECT * FROM products WHERE numberQR = :qr")
+    fun getProductByQr(qr: String): Product?
 }
 
 
