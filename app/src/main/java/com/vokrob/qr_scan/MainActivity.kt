@@ -18,10 +18,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsCompat
@@ -30,6 +32,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.vokrob.qr_scan.data.MainDb
 import com.vokrob.qr_scan.data.Product
+import com.vokrob.qr_scan.ui.theme.Purple80
 import com.vokrob.qr_scan.ui.theme.QR_ScanTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -72,6 +75,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val scanCheckLauncher = registerForActivityResult(ScanContract()) { result ->
+        if (result.contents == null) {
+            Toast.makeText(this, "Scan data is null", Toast.LENGTH_SHORT).show()
+        } else {
+            CoroutineScope(Dispatchers.IO).launch {
+                val productByQr = mainDb.dao.getProductByQr(result.contents)
+
+                if (productByQr == null) {
+                    Toast.makeText(this@MainActivity, "Product not added", Toast.LENGTH_SHORT)
+                        .show()
+                } else {
+                    mainDb.dao.updateProduct(productByQr.copy(isChecked = true))
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -99,16 +119,19 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .padding(top = 50.dp)
                             .fillMaxWidth()
-                            .fillMaxHeight(0.9f)
+                            .fillMaxHeight(0.8f)
                     ) {
                         items(productStateList.value) { product ->
-                            Spacer(
-                                modifier = Modifier.height(10.dp)
-                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(start = 10.dp, end = 10.dp)
+                                    .padding(start = 10.dp, end = 10.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (product.isChecked) Color.Blue else Purple80,
+                                    contentColor = if (product.isChecked) Purple80 else Color.Blue
+                                )
                             ) {
                                 Text(
                                     modifier = Modifier
@@ -120,12 +143,17 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+
                     Button(
                         onClick = { scan() }
                     ) {
-                        Text(
-                            text = "Add new product"
-                        )
+                        Text("Add new product")
+                    }
+
+                    Button(
+                        onClick = { scanCheck() }
+                    ) {
+                        Text("Check product")
                     }
                 }
             }
@@ -133,14 +161,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun scan() {
-        val options = ScanOptions()
+        scanLauncher.launch(getScanOptions())
+    }
 
-        options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-        options.setPrompt("Scan a barcode")
-        options.setCameraId(0)
-        options.setBeepEnabled(false)
-        options.setBarcodeImageEnabled(true)
-        scanLauncher.launch(options)
+    private fun scanCheck() {
+        scanCheckLauncher.launch(getScanOptions())
+    }
+
+    private fun getScanOptions(): ScanOptions {
+        return ScanOptions().apply {
+            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            setPrompt("Scan a barcode")
+            setCameraId(0)
+            setBeepEnabled(false)
+            setBarcodeImageEnabled(true)
+        }
     }
 }
 
